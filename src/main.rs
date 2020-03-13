@@ -22,17 +22,11 @@ fn main() -> Result<()> {
 		fs::remove_dir_all(entry.path())?;
 	}
 
-	{
-		match clone_directories(project_path, project_data_path) {
-			Ok(result) => Ok(result),
-			Err(e) => Err(Error::new(ErrorKind::NotFound, e.to_string()))
-		}?;
-
-		fs::remove_file(project_data_path.join("ProjectSettings").join("ProjectVersion.txt"))?;
-
-		archive_package();
-		Ok(())
-	}.unwrap_or_else(|_:()| clean_directory());
+	//If there's an error generating the template, delete it before ending.
+	if let Err(e) = generate_template(project_path, project_data_path) {
+		clean_directory();
+		return Err(e);
+	}
 
 	clean_directory();
 
@@ -76,4 +70,16 @@ fn clean_directory() {
 
 	fs_extra::remove_items(&from_paths)
 		.expect("Couldn't remove the cloned package directory.");
+}
+
+fn generate_template(project_path: &Path, project_data_path: &Path) -> Result<()> {
+	match clone_directories(project_path, project_data_path) {
+		Ok(result) => Ok(result),
+		Err(e) => Err(Error::new(ErrorKind::NotFound, e.to_string()))
+	}?;
+
+	fs::remove_file(project_data_path.join("ProjectSettings").join("ProjectVersion.txt"))?;
+
+	archive_package();
+	Ok(())
 }
