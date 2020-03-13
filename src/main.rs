@@ -1,6 +1,8 @@
 extern crate tar;
 extern crate flate2;
 extern crate fs_extra;
+extern crate serde_json;
+extern crate serde_yaml;
 
 use std::{fs, fs::File};
 use std::path::Path;
@@ -10,6 +12,8 @@ use flate2::read::GzDecoder;
 use tar::Archive;
 use fs_extra::dir::CopyOptions;
 use std::io::{Result, Error, ErrorKind};
+use serde_json::json;
+use std::collections::BTreeMap;
 
 fn main() -> Result<()> {
 	let project_path = Path::new("C:/Users/misabiko/Documents/Coding/UnityProjects/Clean URP");
@@ -28,7 +32,7 @@ fn main() -> Result<()> {
 		return Err(e);
 	}
 
-	clean_directory();
+	//clean_directory();
 
 	Ok(())
 }
@@ -80,6 +84,35 @@ fn generate_template(project_path: &Path, project_data_path: &Path) -> Result<()
 
 	fs::remove_file(project_data_path.join("ProjectSettings").join("ProjectVersion.txt"))?;
 
+	edit_package_json()?;
+
+	edit_project_settings()?;
+
 	archive_package();
+	Ok(())
+}
+
+fn edit_package_json() -> Result<()> {
+	let package_data = fs::read_to_string("package/package.json")?;
+	let mut parsed_package: serde_json::Value = serde_json::from_str(&package_data)?;
+
+	parsed_package["name"] = json!("com.misabiko.template.clean-urp");
+	parsed_package["displayName"] = json!("Clean URP");
+	parsed_package["version"] = json!("0.1.0");
+	parsed_package["description"] = json!("This is an empty 3D project that uses Unity's Universal Render Pipeline");
+
+	fs::write("package/package.json", parsed_package.to_string())?;
+
+	Ok(())
+}
+
+fn edit_project_settings() -> Result<()> {
+	/*let data = fs::read_to_string("package/ProjectData~/ProjectSettings/ProjectSettings.asset")?;
+	let mut parsed_settings: BTreeMap<String, String> = serde_json::from_str(&data)?;
+
+	parsed_settings.insert("templatePackageId".to_string(), "com.misabiko.template.clean-urp@0.1.0".to_string());
+
+	fs::write("package/ProjectData~/ProjectSettings/ProjectSettings.asset", serde_yaml::to_string(&parsed_settings))?;*/
+
 	Ok(())
 }
