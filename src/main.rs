@@ -2,20 +2,41 @@ extern crate tar;
 extern crate flate2;
 extern crate fs_extra;
 
-//use std::env;
 use std::{fs, fs::File};
+use std::path::Path;
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use fs_extra::dir::CopyOptions;
 use flate2::read::GzDecoder;
 use tar::Archive;
+use fs_extra::dir::CopyOptions;
+use std::io::{Result, Error, ErrorKind};
 
-fn main() {
-	unpack_unity_template("C:\\Program Files\\Unity\\Hub\\Editor\\2019.3.3f1\\Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz");
+fn main() -> Result<()> {
+	let project_path = Path::new("C:/Users/misabiko/Documents/Coding/UnityProjects/Clean URP");
+	let project_data_path= Path::new("package/ProjectData~");
 
-	archive_package();
+	unpack_unity_template("C:\\Program Files\\Unity\\Hub\\Editor\\2019.3.5f1\\Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz");
+
+	for entry in fs::read_dir(project_data_path)? {
+		let entry = entry?;
+		fs::remove_dir_all(entry.path())?;
+	}
+
+	{
+		match clone_directories(project_path, project_data_path) {
+			Ok(result) => Ok(result),
+			Err(e) => Err(Error::new(ErrorKind::NotFound, e.to_string()))
+		}?;
+
+		fs::remove_file(project_data_path.join("ProjectSettings").join("ProjectVersion.txt"))?;
+
+		archive_package();
+		Ok(())
+	}.unwrap_or_else(|_:()| clean_directory());
 
 	clean_directory();
+
+	Ok(())
 }
 
 fn unpack_unity_template(path: &str) {
@@ -27,19 +48,26 @@ fn unpack_unity_template(path: &str) {
 		.expect("Couldn't unpack the sample tgz.");
 }
 
-fn clone_directory(path: &str) {
+fn clone_directory<P: AsRef<Path>>(from: P, to: P) -> fs_extra::error::Result<u64> {
 	let mut from_paths = Vec::new();
-	from_paths.push(path.clone());
+	from_paths.push(from);
 
-	fs_extra::copy_items(&from_paths, ".", &CopyOptions::new())
-		.expect("Couldn't clone the package directory.");
+	fs_extra::copy_items(&from_paths, to, &CopyOptions::new())
+}
+
+fn clone_directories(project_path: &Path, project_data_path: &Path) -> fs_extra::error::Result<()> {
+	clone_directory(project_path.join("Assets"), project_data_path.to_path_buf())?;
+	clone_directory(project_path.join("Packages"), project_data_path.to_path_buf())?;
+	clone_directory(project_path.join("ProjectSettings"), project_data_path.to_path_buf())?;
+
+	Ok(())
 }
 
 fn archive_package() {
 	let tgz = File::create("com.misabiko.template.clean-urp.tgz").unwrap();
 	let enc = GzEncoder::new(tgz, Compression::default());
 	let mut tar = tar::Builder::new(enc);
-	tar.append_dir_all("package", "package");
+	tar.append_dir_all("package", "package").unwrap();
 }
 
 fn clean_directory() {
