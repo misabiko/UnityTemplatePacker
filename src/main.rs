@@ -13,20 +13,24 @@ use tar::Archive;
 use fs_extra::dir::CopyOptions;
 use std::io::{Result, Error, ErrorKind};
 use serde_json::json;
+use std::env;
 
 fn main() -> Result<()> {
-	let project_path = Path::new("C:/Users/misabiko/Documents/Coding/UnityProjects/Clean URP");
-	let project_data_path= Path::new("package/ProjectData~");
+	let args: Vec<String> = env::args().collect();
+	println!("{:?}", args);
 
-	unpack_unity_template("C:\\Program Files\\Unity\\Hub\\Editor\\2019.3.5f1\\Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz");
+	let project_path = Path::new(&args[1]);
+	let editor_path = Path::new(&args[2]);
 
-	for entry in fs::read_dir(project_data_path)? {
+	unpack_unity_template(editor_path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz"));
+
+	for entry in fs::read_dir("package/ProjectData~")? {
 		let entry = entry?;
 		fs::remove_dir_all(entry.path())?;
 	}
 
 	//If there's an error generating the template, delete it before ending.
-	if let Err(e) = generate_template(project_path, project_data_path) {
+	if let Err(e) = generate_template(project_path) {
 		clean_directory();
 		return Err(e);
 	}
@@ -36,7 +40,7 @@ fn main() -> Result<()> {
 	Ok(())
 }
 
-fn unpack_unity_template(path: &str) {
+fn unpack_unity_template<P: AsRef<Path>>(path: P) {
 	let tgz = File::open(path)
 		.expect("Couldn't read the sample tgz.");
 	let tar = GzDecoder::new(tgz);
@@ -52,7 +56,9 @@ fn clone_directory<P: AsRef<Path>>(from: P, to: P) -> fs_extra::error::Result<u6
 	fs_extra::copy_items(&from_paths, to, &CopyOptions::new())
 }
 
-fn clone_directories(project_path: &Path, project_data_path: &Path) -> fs_extra::error::Result<()> {
+fn clone_directories(project_path: &Path) -> fs_extra::error::Result<()> {
+	let project_data_path = Path::new("package/ProjectData~");
+
 	clone_directory(project_path.join("Assets"), project_data_path.to_path_buf())?;
 	clone_directory(project_path.join("Packages"), project_data_path.to_path_buf())?;
 	clone_directory(project_path.join("ProjectSettings"), project_data_path.to_path_buf())?;
@@ -75,13 +81,13 @@ fn clean_directory() {
 		.expect("Couldn't remove the cloned package directory.");
 }
 
-fn generate_template(project_path: &Path, project_data_path: &Path) -> Result<()> {
-	match clone_directories(project_path, project_data_path) {
+fn generate_template(project_path: &Path) -> Result<()> {
+	match clone_directories(project_path) {
 		Ok(result) => Ok(result),
 		Err(e) => Err(Error::new(ErrorKind::NotFound, e.to_string()))
 	}?;
 
-	fs::remove_file(project_data_path.join("ProjectSettings").join("ProjectVersion.txt"))?;
+	fs::remove_file(Path::new("package/ProjectData~").join("ProjectSettings").join("ProjectVersion.txt"))?;
 
 	edit_package_json()?;
 
