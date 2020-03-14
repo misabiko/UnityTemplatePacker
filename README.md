@@ -1,5 +1,5 @@
 # UnityTemplatePacker
-Packs Unity projects into usable template
+Packs Unity projects into a usable template
 
 `unity-template-packer <project path> <editor path>`
 
