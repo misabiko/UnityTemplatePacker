@@ -17,10 +17,19 @@ use std::env;
 
 fn main() -> Result<()> {
 	let args: Vec<String> = env::args().collect();
-	println!("{:?}", args);
+
+	if args.len() < 3 {
+		panic!("not enough arguments");
+	}
 
 	let project_path = Path::new(&args[1]);
+	if !project_path.exists() {
+		return Err(Error::new(ErrorKind::InvalidInput, format!("Project Path \"{}\" doesn't exist.", &args[1])));
+	}
 	let editor_path = Path::new(&args[2]);
+	if !editor_path.exists() {
+		return Err(Error::new(ErrorKind::InvalidInput, format!("Editor Path \"{}\" doesn't exist.", &args[1])));
+	}
 
 	unpack_unity_template(editor_path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz"));
 
@@ -36,6 +45,8 @@ fn main() -> Result<()> {
 	}
 
 	clean_directory();
+
+	println!("com.misabiko.template.clean-urp.tgz was created.");
 
 	Ok(())
 }
