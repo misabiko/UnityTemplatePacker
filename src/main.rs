@@ -13,7 +13,6 @@ use tar::Archive;
 use fs_extra::dir::CopyOptions;
 use std::io::{Result, Error, ErrorKind};
 use serde_json::json;
-use std::collections::BTreeMap;
 
 fn main() -> Result<()> {
 	let project_path = Path::new("C:/Users/misabiko/Documents/Coding/UnityProjects/Clean URP");
@@ -32,7 +31,7 @@ fn main() -> Result<()> {
 		return Err(e);
 	}
 
-	//clean_directory();
+	clean_directory();
 
 	Ok(())
 }
@@ -93,8 +92,8 @@ fn generate_template(project_path: &Path, project_data_path: &Path) -> Result<()
 }
 
 fn edit_package_json() -> Result<()> {
-	let package_data = fs::read_to_string("package/package.json")?;
-	let mut parsed_package: serde_json::Value = serde_json::from_str(&package_data)?;
+	let package_data = File::open("package/package.json")?;
+	let mut parsed_package: serde_json::Value = serde_json::from_reader(package_data)?;
 
 	parsed_package["name"] = json!("com.misabiko.template.clean-urp");
 	parsed_package["displayName"] = json!("Clean URP");
@@ -107,12 +106,13 @@ fn edit_package_json() -> Result<()> {
 }
 
 fn edit_project_settings() -> Result<()> {
-	/*let data = fs::read_to_string("package/ProjectData~/ProjectSettings/ProjectSettings.asset")?;
-	let mut parsed_settings: BTreeMap<String, String> = serde_json::from_str(&data)?;
+	let f = File::open("package/ProjectData~/ProjectSettings/ProjectSettings.asset")?;
+	let mut parsed_settings: serde_yaml::Value = serde_yaml::from_reader(f).unwrap();
 
-	parsed_settings.insert("templatePackageId".to_string(), "com.misabiko.template.clean-urp@0.1.0".to_string());
+	let player_settings = parsed_settings.get_mut("PlayerSettings").unwrap().as_mapping_mut().unwrap();
+	player_settings.insert(serde_yaml::Value::from("templatePackageId"), serde_yaml::Value::from("com.misabiko.template.clean-urp@0.1.0"));
+	player_settings.insert(serde_yaml::Value::from("templateDefaultScene"), serde_yaml::Value::from("Assets/Scenes/MainScene.unity"));
 
-	fs::write("package/ProjectData~/ProjectSettings/ProjectSettings.asset", serde_yaml::to_string(&parsed_settings))?;*/
-
+	fs::write("package/ProjectData~/ProjectSettings/ProjectSettings.asset", serde_yaml::to_string(&parsed_settings).unwrap())?;
 	Ok(())
 }
