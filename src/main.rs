@@ -3,6 +3,7 @@ extern crate flate2;
 extern crate fs_extra;
 extern crate serde_json;
 extern crate serde_yaml;
+extern crate iced;
 
 use std::{fs, fs::File};
 use std::path::Path;
@@ -15,41 +16,7 @@ use std::io::{Result, Error, ErrorKind};
 use serde_json::json;
 use std::env;
 
-fn main() -> Result<()> {
-	let args: Vec<String> = env::args().collect();
-
-	if args.len() < 3 {
-		panic!("not enough arguments");
-	}
-
-	let project_path = Path::new(&args[1]);
-	if !project_path.exists() {
-		return Err(Error::new(ErrorKind::InvalidInput, format!("Project Path \"{}\" doesn't exist.", &args[1])));
-	}
-	let editor_path = Path::new(&args[2]);
-	if !editor_path.exists() {
-		return Err(Error::new(ErrorKind::InvalidInput, format!("Editor Path \"{}\" doesn't exist.", &args[1])));
-	}
-
-	unpack_unity_template(editor_path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz"));
-
-	for entry in fs::read_dir("package/ProjectData~")? {
-		let entry = entry?;
-		fs::remove_dir_all(entry.path())?;
-	}
-
-	//If there's an error generating the template, delete it before ending.
-	if let Err(e) = generate_template(project_path) {
-		clean_directory();
-		return Err(e);
-	}
-
-	clean_directory();
-
-	println!("com.misabiko.template.clean-urp.tgz was created.");
-
-	Ok(())
-}
+use iced::{button, Button, Text, Column, Sandbox, Element, Settings, text_input, Container, Length};
 
 fn unpack_unity_template<P: AsRef<Path>>(path: P) {
 	let tgz = File::open(path)
@@ -131,5 +98,128 @@ fn edit_project_settings() -> Result<()> {
 	player_settings.insert(serde_yaml::Value::from("templateDefaultScene"), serde_yaml::Value::from("Assets/Scenes/MainScene.unity"));
 
 	fs::write("package/ProjectData~/ProjectSettings/ProjectSettings.asset", serde_yaml::to_string(&parsed_settings).unwrap())?;
+	Ok(())
+}
+
+fn pack(project_path: &Path, editor_path: &Path) -> Result<()> {
+	unpack_unity_template(editor_path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz"));
+
+	for entry in fs::read_dir("package/ProjectData~")? {
+		let entry = entry?;
+		fs::remove_dir_all(entry.path())?;
+	}
+
+	//If there's an error generating the template, delete it before ending.
+	if let Err(e) = generate_template(project_path) {
+		clean_directory();
+		return Err(e);
+	}
+
+	clean_directory();
+
+	println!("com.misabiko.template.clean-urp.tgz was created.");
+
+	Ok(())
+}
+
+#[derive(Default)]
+struct TemplatePacker {
+	src_project_input: text_input::State,
+	src_project_value: String,
+	editor_input: text_input::State,
+	editor_value: String,
+	pack_button: button::State,
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+	Pack,
+	SrcProjectChanged(String),
+	EditorChanged(String),
+}
+
+impl Sandbox for TemplatePacker {
+	type Message = Message;
+
+	fn new() -> Self {
+		Self::default()
+	}
+
+	fn title(&self) -> String {
+		String::from("Unity Template Packer")
+	}
+
+	fn update(&mut self, message: Message) {
+		match message {
+			Message::Pack => println!("Pack!"),
+			Message::SrcProjectChanged(value) => self.src_project_value = value,
+			Message::EditorChanged(value) => self.editor_value = value,
+		}
+	}
+
+	fn view(&mut self) -> Element<Message> {
+		let column = Column::new()
+			.spacing(20)
+			.padding(20)
+			.max_width(600)
+			.push(Text::new("Source Project Path:"))
+			.push(
+				text_input::TextInput::new(
+					&mut self.src_project_input,
+					"Source Project Path",
+					&self.src_project_value,
+					Message::SrcProjectChanged
+				)
+				.padding(10)
+				.size(20)
+			)
+			.push(Text::new("Editor Project Path:"))
+			.push(
+				text_input::TextInput::new(
+					&mut self.editor_input,
+					"Editor Path",
+					&self.editor_value,
+					Message::EditorChanged
+				)
+				.padding(10)
+				.size(20)
+			)
+			.push(
+				Button::new(&mut self.pack_button, Text::new("Pack"))
+					.on_press(Message::Pack)
+			);
+
+		Container::new(column)
+			.width(Length::Fill)
+			.height(Length::Fill)
+			.center_x()
+			.into()
+	}
+}
+
+fn parse_args(args: &Vec<String>) -> Result<(&Path, &Path)> {
+	let project_path = Path::new(&args[1]);
+	if !project_path.exists() {
+		return Err(Error::new(ErrorKind::InvalidInput, format!("Project Path \"{}\" doesn't exist.", &args[1])));
+	}
+	let editor_path = Path::new(&args[2]);
+	if !editor_path.exists() {
+		return Err(Error::new(ErrorKind::InvalidInput, format!("Editor Path \"{}\" doesn't exist.", &args[1])));
+	}
+
+	Ok((project_path, editor_path))
+}
+
+fn main() -> Result<()> {
+	let args: Vec<String> = env::args().collect();
+
+	if args.len() > 1 {
+		let (project_path, editor_path) = parse_args(&args)?;
+
+		return pack(project_path, editor_path);
+	}else {
+		TemplatePacker::run(Settings::default());
+	}
+
 	Ok(())
 }
