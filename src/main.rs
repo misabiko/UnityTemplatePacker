@@ -151,7 +151,10 @@ impl Sandbox for TemplatePacker {
 
 	fn update(&mut self, message: Message) {
 		match message {
-			Message::Pack => println!("Pack!"),
+			Message::Pack => {
+				println!("Pack!");
+				pack(Path::new(&self.src_project_value), Path::new(&self.editor_value)).unwrap();
+			}
 			Message::SrcProjectChanged(value) => self.src_project_value = value,
 			Message::EditorChanged(value) => self.editor_value = value,
 		}
