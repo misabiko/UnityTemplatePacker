@@ -9,6 +9,7 @@ use std::{
 	fs::{self, File},
 	path::{Path, PathBuf},
 	io,
+	error::Error,
 };
 use flate2::{
 	Compression,
@@ -173,7 +174,7 @@ impl Sandbox for TemplatePacker {
 					&mut self.src_project_input,
 					"Source Project Path",
 					&self.src_project_value,
-					Message::SrcProjectChanged
+					Message::SrcProjectChanged,
 				)
 					.padding(10)
 					.size(20)
@@ -184,7 +185,7 @@ impl Sandbox for TemplatePacker {
 					&mut self.editor_input,
 					"Editor Path",
 					&self.editor_value,
-					Message::EditorChanged
+					Message::EditorChanged,
 				)
 					.padding(10)
 					.size(20)
@@ -222,10 +223,38 @@ pub struct UnityEditor {
 
 impl UnityEditor {
 	pub fn new(path: &Path) -> io::Result<Self> {
+		if let Err(err) = UnityEditor::check_path(path) {
+			return Err(err);
+		}
+
 		Ok(UnityEditor {
 			path: PathBuf::from(path),
-			templates_path: path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates"),
+			templates_path: UnityEditor::get_template_path(path)?,
 		})
+	}
+
+	fn check_path(path: &Path) -> io::Result<()> {
+		if !path.exists() {
+			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Editor path is not valid: {:?}", path)));
+		}
+
+		Ok(())
+	}
+
+	fn get_template_path(path: &Path) -> io::Result<PathBuf> {
+		let template_path = path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates");
+
+		if !template_path.exists() {
+			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Editor's template path does not exist: {:?}", template_path)));
+		}
+
+		if !fs::read_dir(&template_path)?.any(
+			|entry| entry.unwrap().path().extension().unwrap() == "tgz"
+		) {
+			return Err(io::Error::new(io::ErrorKind::InvalidInput, "Editor's template path does not contain a template"));
+		}
+
+		Ok(template_path)
 	}
 }
 
@@ -235,31 +264,58 @@ pub struct UnityProject {
 
 impl UnityProject {
 	pub fn new(path: &Path) -> io::Result<Self> {
+		if let Err(err) = UnityProject::check_path(path) {
+			return Err(err);
+		}
+
 		Ok(UnityProject {
 			path: PathBuf::from(path)
 		})
+	}
+
+	fn check_path(path: &Path) -> io::Result<()> {
+		if !path.exists() {
+			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Project path does not exist: {:?}", path)));
+		}
+
+		let project_version_path = path.join("ProjectSettings/ProjectVersion.txt");
+		if !project_version_path.exists() {
+			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Project path isn't a valid project, missing: {:?}", project_version_path)));
+		}
+
+		//TODO compare project version with editor version
+
+		Ok(())
 	}
 }
 
 pub struct Config {
 	pub project: UnityProject,
 	pub editor: UnityEditor,
+	pub template_name: String,
+	pub template_version: String,
 }
 
 impl Config {
 	pub fn new(args: &[String]) -> io::Result<Config> {
-		if args.len() < 3 {
+		if args.len() < 5 {
 			return Err(io::Error::new(io::ErrorKind::InvalidInput, "not enough arguments"));
 		}
 
 		let project = UnityProject::new(args[1].as_ref())?;
 		let editor = UnityEditor::new(args[2].as_ref())?;
+		let template_name = String::from(&args[3]);
+		let template_version = String::from(&args[4]);
 
-		Ok(Config {project, editor})
+		Ok(Config { project, editor, template_name, template_version })
 	}
 }
 
-pub fn run(config: Config) -> Result<(), ()> {
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+	if let Some(template_path) = config.editor.templates_path.to_str() {
+		println!("Template path: {}", template_path);
+	}
+
 	Ok(())
 }
 
@@ -267,15 +323,51 @@ pub fn run(config: Config) -> Result<(), ()> {
 mod tests {
 	use super::*;
 
+	const SAMPLE_PROJECT_PATH: &'static str = "C:/Users/misabiko/Documents/Coding/UnityProjects/Clean URP";
+	const SAMPLE_EDITOR_PATH: &'static str = "C:/Program Files/Unity/Hub/Editor/2019.4.1f1";
+
 	#[test]
 	fn invalid_editor_path() {
-		let editor = UnityEditor::new(".".as_ref());
-		assert!(editor.is_err(), "Wrong editor path wasn't detected.");
+		let non_existing_path = UnityEditor::new("ksdjngkjsfgn".as_ref());
+		let invalid_path = UnityEditor::new(".".as_ref());
+
+		assert!(non_existing_path.is_err(), "Non-existing editor path wasn't detected.");
+		assert!(invalid_path.is_err(), "Invalid editor path wasn't detected.");
 	}
 
 	#[test]
 	fn invalid_project_path() {
 		let project = UnityProject::new(".".as_ref());
 		assert!(project.is_err(), "Wrong project path wasn't detected.");
+	}
+
+	#[test]
+	fn valid_editor_path() {
+		let editor = UnityEditor::new(SAMPLE_EDITOR_PATH.as_ref());
+		assert!(editor.is_ok());
+	}
+
+	#[test]
+	fn valid_project_path() {
+		let project = UnityProject::new(SAMPLE_PROJECT_PATH.as_ref());
+		assert!(project.is_ok());
+	}
+
+	#[test]
+	fn new_template_added() {
+		let args = [
+			String::from(""),
+			String::from(SAMPLE_PROJECT_PATH),
+			String::from(SAMPLE_EDITOR_PATH),
+			String::from("Clean URP"),
+			String::from("0.0.1"),
+		];
+		let config = Config::new(&args).unwrap();
+
+		let new_template_path = config.editor.templates_path.with_file_name(config.template_name.to_owned() + "-" + &config.template_version + ".tgz");
+		println!("New Template Path: {:?}", new_template_path);
+
+		run(config);
+		assert!(new_template_path.exists());
 	}
 }
