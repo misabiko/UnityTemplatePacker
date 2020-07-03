@@ -218,7 +218,7 @@ impl Config {
 	}
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+pub fn run_cli(config: Config) -> Result<(), Box<dyn Error>> {
 	if let Some(template_path) = config.editor.templates_path.to_str() {
 		println!("Template path: {}", template_path);
 	}
@@ -274,7 +274,7 @@ mod tests {
 		let new_template_path = config.editor.templates_path.with_file_name(config.template_name.to_owned() + "-" + &config.template_version + ".tgz");
 		println!("New Template Path: {:?}", new_template_path);
 
-		run(config);
+		run_cli(config);
 		assert!(new_template_path.exists());
 	}
 }

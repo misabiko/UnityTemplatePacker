@@ -1,10 +1,9 @@
 extern crate iced;
 
-use std::path::{Path, PathBuf};
-use iced::{button, Button, Text, Column, Sandbox, Element, text_input, Container, Length};
+use iced::{button, Button, Text, Column, Sandbox, Element, text_input, Container, Length, Settings};
 
 #[derive(Default)]
-struct TemplatePacker {
+pub struct TemplatePacker {
 	src_project_input: text_input::State,
 	src_project_value: String,
 	editor_input: text_input::State,
@@ -13,7 +12,7 @@ struct TemplatePacker {
 }
 
 #[derive(Debug, Clone)]
-enum Message {
+pub enum Message {
 	Pack,
 	SrcProjectChanged(String),
 	EditorChanged(String),
@@ -78,5 +77,11 @@ impl Sandbox for TemplatePacker {
 			.height(Length::Fill)
 			.center_x()
 			.into()
+	}
+}
+
+impl TemplatePacker {
+	pub fn run_default() {
+		TemplatePacker::run(Settings::default());
 	}
 }
