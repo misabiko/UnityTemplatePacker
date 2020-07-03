@@ -3,6 +3,8 @@ use std::process;
 
 use unity_template_packer::Config;
 
+mod gui;
+
 fn main() {
 	//project_path, editor_path, template_name, template_version
 	let args: Vec<String> = env::args().collect();

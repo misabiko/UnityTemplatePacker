@@ -3,7 +3,6 @@ extern crate flate2;
 extern crate fs_extra;
 extern crate serde_json;
 extern crate serde_yaml;
-extern crate iced;
 
 use std::{
 	fs::{self, File},
@@ -19,7 +18,6 @@ use flate2::{
 use tar::Archive;
 use fs_extra::dir::CopyOptions;
 use serde_json::json;
-use iced::{button, Button, Text, Column, Sandbox, Element, text_input, Container, Length};
 
 fn unpack_unity_template<P: AsRef<Path>>(path: P) {
 	let tgz = File::open(path)
@@ -123,97 +121,6 @@ fn pack(project_path: &Path, editor_path: &Path) -> io::Result<()> {
 	println!("com.misabiko.template.clean-urp.tgz was created.");
 
 	Ok(())
-}
-
-#[derive(Default)]
-struct TemplatePacker {
-	src_project_input: text_input::State,
-	src_project_value: String,
-	editor_input: text_input::State,
-	editor_value: String,
-	pack_button: button::State,
-}
-
-#[derive(Debug, Clone)]
-enum Message {
-	Pack,
-	SrcProjectChanged(String),
-	EditorChanged(String),
-}
-
-impl Sandbox for TemplatePacker {
-	type Message = Message;
-
-	fn new() -> Self {
-		Self::default()
-	}
-
-	fn title(&self) -> String {
-		String::from("Unity Template Packer")
-	}
-
-	fn update(&mut self, message: Message) {
-		match message {
-			Message::Pack => {
-				println!("Pack!");
-				pack(Path::new(&self.src_project_value), Path::new(&self.editor_value)).unwrap();
-			}
-			Message::SrcProjectChanged(value) => self.src_project_value = value,
-			Message::EditorChanged(value) => self.editor_value = value,
-		}
-	}
-
-	fn view(&mut self) -> Element<Message> {
-		let column = Column::new()
-			.spacing(20)
-			.padding(20)
-			.max_width(600)
-			.push(Text::new("Source Project Path:"))
-			.push(
-				text_input::TextInput::new(
-					&mut self.src_project_input,
-					"Source Project Path",
-					&self.src_project_value,
-					Message::SrcProjectChanged,
-				)
-					.padding(10)
-					.size(20)
-			)
-			.push(Text::new("Editor Project Path:"))
-			.push(
-				text_input::TextInput::new(
-					&mut self.editor_input,
-					"Editor Path",
-					&self.editor_value,
-					Message::EditorChanged,
-				)
-					.padding(10)
-					.size(20)
-			)
-			.push(
-				Button::new(&mut self.pack_button, Text::new("Pack"))
-					.on_press(Message::Pack)
-			);
-
-		Container::new(column)
-			.width(Length::Fill)
-			.height(Length::Fill)
-			.center_x()
-			.into()
-	}
-}
-
-fn parse_args(args: &Vec<String>) -> io::Result<(&Path, &Path)> {
-	let project_path = Path::new(&args[1]);
-	if !project_path.exists() {
-		return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Project Path \"{}\" doesn't exist.", &args[1])));
-	}
-	let editor_path = Path::new(&args[2]);
-	if !editor_path.exists() {
-		return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Editor Path \"{}\" doesn't exist.", &args[1])));
-	}
-
-	Ok((project_path, editor_path))
 }
 
 pub struct UnityEditor {
