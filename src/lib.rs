@@ -102,27 +102,6 @@ fn edit_project_settings() -> io::Result<()> {
 	Ok(())
 }
 
-fn pack(project_path: &Path, editor_path: &Path) -> io::Result<()> {
-	unpack_unity_template(editor_path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates\\com.unity.template.3d-4.2.6.tgz"));
-
-	for entry in fs::read_dir("package/ProjectData~")? {
-		let entry = entry?;
-		fs::remove_dir_all(entry.path())?;
-	}
-
-	//If there's an error generating the template, delete it before ending.
-	if let Err(e) = generate_template(project_path) {
-		clean_directory();
-		return Err(e);
-	}
-
-	clean_directory();
-
-	println!("com.misabiko.template.clean-urp.tgz was created.");
-
-	Ok(())
-}
-
 pub struct UnityEditor {
 	pub path: PathBuf,
 	pub templates_path: PathBuf,
@@ -219,9 +198,22 @@ impl Config {
 }
 
 pub fn run_cli(config: Config) -> Result<(), Box<dyn Error>> {
-	if let Some(template_path) = config.editor.templates_path.to_str() {
-		println!("Template path: {}", template_path);
+	unpack_unity_template(config.editor.templates_path.join("com.unity.template.3d-4.2.8.tgz"));
+
+	for entry in fs::read_dir("package/ProjectData~")? {
+		let entry = entry?;
+		fs::remove_dir_all(entry.path())?;
 	}
+
+	//If there's an error generating the template, delete it before ending.
+	if let Err(e) = generate_template(&config.project.path) {
+		clean_directory();
+		return Err(Box::new(e));
+	}
+
+	clean_directory();
+
+	println!("com.misabiko.template.clean-urp.tgz was created.");
 
 	Ok(())
 }
@@ -271,10 +263,7 @@ mod tests {
 		];
 		let config = Config::new(&args).unwrap();
 
-		let new_template_path = config.editor.templates_path.with_file_name(config.template_name.to_owned() + "-" + &config.template_version + ".tgz");
-		println!("New Template Path: {:?}", new_template_path);
-
 		run_cli(config);
-		assert!(new_template_path.exists());
+		assert!(PathBuf::from("com.misabiko.template.clean-urp.tgz").exists());
 	}
 }
