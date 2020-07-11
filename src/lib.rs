@@ -6,7 +6,7 @@ extern crate serde_yaml;
 
 use std::{
 	fs::{self, File},
-	path::{Path, PathBuf},
+	path::Path,
 	io,
 	error::Error,
 };
@@ -18,6 +18,11 @@ use flate2::{
 use tar::Archive;
 use fs_extra::dir::CopyOptions;
 use serde_json::json;
+
+mod config;
+
+pub use config::Config;
+use crate::config::PackerConfig;
 
 fn unpack_unity_template<P: AsRef<Path>>(path: P) {
 	let tgz = File::open(path)
@@ -102,102 +107,7 @@ fn edit_project_settings() -> io::Result<()> {
 	Ok(())
 }
 
-pub struct UnityEditor {
-	pub path: PathBuf,
-	pub templates_path: PathBuf,
-}
-
-impl UnityEditor {
-	pub fn new(path: &Path) -> io::Result<Self> {
-		if let Err(err) = UnityEditor::check_path(path) {
-			return Err(err);
-		}
-
-		Ok(UnityEditor {
-			path: PathBuf::from(path),
-			templates_path: UnityEditor::get_template_path(path)?,
-		})
-	}
-
-	fn check_path(path: &Path) -> io::Result<()> {
-		if !path.exists() {
-			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Editor path is not valid: {:?}", path)));
-		}
-
-		Ok(())
-	}
-
-	fn get_template_path(path: &Path) -> io::Result<PathBuf> {
-		let template_path = path.join("Editor\\Data\\Resources\\PackageManager\\ProjectTemplates");
-
-		if !template_path.exists() {
-			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Editor's template path does not exist: {:?}", template_path)));
-		}
-
-		if !fs::read_dir(&template_path)?.any(
-			|entry| entry.unwrap().path().extension().unwrap() == "tgz"
-		) {
-			return Err(io::Error::new(io::ErrorKind::InvalidInput, "Editor's template path does not contain a template"));
-		}
-
-		Ok(template_path)
-	}
-}
-
-pub struct UnityProject {
-	pub path: PathBuf,
-}
-
-impl UnityProject {
-	pub fn new(path: &Path) -> io::Result<Self> {
-		if let Err(err) = UnityProject::check_path(path) {
-			return Err(err);
-		}
-
-		Ok(UnityProject {
-			path: PathBuf::from(path)
-		})
-	}
-
-	fn check_path(path: &Path) -> io::Result<()> {
-		if !path.exists() {
-			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Project path does not exist: {:?}", path)));
-		}
-
-		let project_version_path = path.join("ProjectSettings/ProjectVersion.txt");
-		if !project_version_path.exists() {
-			return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Project path isn't a valid project, missing: {:?}", project_version_path)));
-		}
-
-		//TODO compare project version with editor version
-
-		Ok(())
-	}
-}
-
-pub struct Config {
-	pub project: UnityProject,
-	pub editor: UnityEditor,
-	pub template_name: String,
-	pub template_version: String,
-}
-
-impl Config {
-	pub fn new(args: &[String]) -> io::Result<Config> {
-		if args.len() < 5 {
-			return Err(io::Error::new(io::ErrorKind::InvalidInput, "not enough arguments"));
-		}
-
-		let project = UnityProject::new(args[1].as_ref())?;
-		let editor = UnityEditor::new(args[2].as_ref())?;
-		let template_name = String::from(&args[3]);
-		let template_version = String::from(&args[4]);
-
-		Ok(Config { project, editor, template_name, template_version })
-	}
-}
-
-pub fn run_cli(config: Config) -> Result<(), Box<dyn Error>> {
+pub fn run_cli(config: PackerConfig) -> Result<(), Box<dyn Error>> {
 	unpack_unity_template(config.editor.templates_path.join("com.unity.template.3d-4.2.8.tgz"));
 
 	for entry in fs::read_dir("package/ProjectData~")? {
@@ -216,6 +126,17 @@ pub fn run_cli(config: Config) -> Result<(), Box<dyn Error>> {
 	println!("com.misabiko.template.clean-urp.tgz was created.");
 
 	Ok(())
+}
+
+pub fn run_help() {
+	let usages = vec![
+		"<project_path> [editor_path]"
+	];
+
+	println!("Usage:");
+	for usage in usages.iter() {
+		println!("\tunity_template_packer {}", usage);
+	}
 }
 
 #[cfg(test)]
