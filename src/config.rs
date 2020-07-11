@@ -77,31 +77,25 @@ impl UnityProject {
 pub struct PackerConfig {
 	pub project: UnityProject,
 	pub editor: UnityEditor,
-	//pub template_name: String,
-	//pub template_version: String,
 }
 
 pub enum Config {
 	Packer (PackerConfig),
-	Help,
 	GUI,
+	Help,
 }
 
 impl Config {
 	pub fn new(args: &[String]) -> io::Result<Config> {
-		if args.len() < 5 {
+		if args.len() < 3 {
 			Ok(Config::Help {})
 		}else {
 			let project = UnityProject::new(args[1].as_ref())?;
 			let editor = UnityEditor::new(args[2].as_ref())?;
-			//let template_name = String::from(&args[3]);
-			//let template_version = String::from(&args[4]);
 
 			Ok(Config::Packer (PackerConfig {
 				project,
 				editor,
-				//template_name,
-				//template_version,
 			}))
 		}
 	}
