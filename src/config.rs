@@ -85,18 +85,76 @@ pub enum Config {
 	Help,
 }
 
+fn list_editors() -> io::Result<Vec<(String, PathBuf)>> {
+	let editors_path = "C:/Program Files/Unity/Hub/Editor";
+	let mut editors = Vec::new();
+
+	for entry in fs::read_dir(editors_path)? {
+		if let Ok(entry) = entry {
+			let path = entry.path();
+			if path.is_dir() {
+				if let Some(file_name) = path.file_name() {
+					if let Some(file_name) = file_name.to_str() {
+						editors.push((file_name.into(), path));
+					}
+				}
+			}
+		}
+	}
+
+	Ok(editors)
+}
+
+fn ask_editor() -> io::Result<UnityEditor> {
+	let editors = list_editors()?;
+
+	if editors.len() == 1 {
+		return UnityEditor::new(&editors[0].1);
+	}
+
+	println!("Please choose an editor for the template:");
+	for (i, entry) in editors.iter().enumerate() {
+		println!("{}- {}", i, &entry.0)
+	}
+
+	let mut input = String::new();
+
+	loop {
+		if let Ok(_) = io::stdin().read_line(&mut input) {
+			if let Ok(index) = input.trim_end().parse::<usize>() {
+				if index < editors.len() {
+					return UnityEditor::new(&editors[index].1)
+				}
+			}
+		}
+
+		println!("Please enter a number between 0 and {}.", editors.len() - 1);
+		input.clear();
+	};
+}
+
 impl Config {
 	pub fn new(args: &[String]) -> io::Result<Config> {
-		if args.len() < 3 {
-			Ok(Config::Help {})
-		}else {
-			let project = UnityProject::new(args[1].as_ref())?;
-			let editor = UnityEditor::new(args[2].as_ref())?;
+		match args.len() {
+			2 => {
+				let project = UnityProject::new(args[1].as_ref())?;
+				let editor = ask_editor()?;
 
-			Ok(Config::Packer (PackerConfig {
-				project,
-				editor,
-			}))
+				Ok(Config::Packer (PackerConfig {
+					project,
+					editor,
+				}))
+			},
+			3 => {
+				let project = UnityProject::new(args[1].as_ref())?;
+				let editor = UnityEditor::new(args[2].as_ref())?;
+
+				Ok(Config::Packer (PackerConfig {
+					project,
+					editor,
+				}))
+			},
+			_ => Ok(Config::Help {}),
 		}
 	}
 }
